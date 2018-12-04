@@ -26,12 +26,11 @@ from monodepth_dataloader import *
 from average_gradients import *
 
 parser = argparse.ArgumentParser(description='Monodepth TensorFlow implementation.')
-
 parser.add_argument('--mode',                      type=str,   help='train or test', default='train')
-parser.add_argument('--task',                      type=str,   help='depth, semantic, semantic-depth, cascade-semantic-depth', default='semantic')
+parser.add_argument('--task',                      type=str,   help='depth, semantic, semantic-depth', default='semantic', choices=['depth', 'semantic', 'semantic-depth'])
 parser.add_argument('--model_name',                type=str,   help='model name', default='semantic-monodepth')
-parser.add_argument('--encoder',                   type=str,   help='type of encoder, vgg or resnet50', default='vgg')
-parser.add_argument('--dataset',                   type=str,   help='dataset to train on, kitti, or cityscapes', default='cityscapes')
+parser.add_argument('--encoder',                   type=str,   help='type of encoder, vgg or resnet50', default='vgg', choices=['vgg', 'resnet50'])
+parser.add_argument('--dataset',                   type=str,   help='dataset to train on, kitti, or cityscapes', default='cityscapes', choices=['kitti','cityscapes'])
 parser.add_argument('--data_path',                 type=str,   help='path to the data', required=True)
 parser.add_argument('--filenames_file',            type=str,   help='path to the filenames text file', required=True)
 parser.add_argument('--input_height',              type=int,   help='input height', default=256)
@@ -53,9 +52,6 @@ parser.add_argument('--checkpoint_path',           type=str,   help='path to a s
 parser.add_argument('--retrain',                               help='if used with checkpoint_path, will restart training from step zero', action='store_true')
 parser.add_argument('--full_summary',                          help='if set, will keep more data for each summary. Warning: the file can become very large', action='store_true')
 parser.add_argument('--no_shuffle', help='Disabling shuffling at train time',   action='store_true')
-
-
-
 args = parser.parse_args()
 
 def post_process_disparity(disp):
@@ -72,98 +68,7 @@ def count_text_lines(file_path):
     f = open(file_path, 'r')
     lines = f.readlines()
     f.close()
-    return len(lines)
-
-def template(params):
-    """Creating a template."""
-
-    with tf.Graph().as_default(), tf.device('/cpu:0'):
-
-        global_step = tf.Variable(0, trainable=False)
-
-        # OPTIMIZER
-        num_training_samples = count_text_lines(args.filenames_file)
-
-        steps_per_epoch = np.ceil(num_training_samples / params.batch_size).astype(np.int32)
-        num_total_steps = params.num_epochs * steps_per_epoch
-        start_learning_rate = args.learning_rate
-
-        boundaries = [np.int32((3/5) * num_total_steps), np.int32((4/5) * num_total_steps)]
-        values = [args.learning_rate, args.learning_rate / 2, args.learning_rate / 4]
-        learning_rate = tf.train.piecewise_constant(global_step, boundaries, values)
-
-        opt_step = tf.train.AdamOptimizer(learning_rate)
-
-        print("total number of samples: {}".format(num_training_samples))
-        print("total number of steps: {}".format(num_total_steps))
-
-        dataloader = MonodepthDataloader(args.data_path, args.filenames_file, params, args.dataset, 'train')
-        left  = dataloader.left_image_batch
-        right = dataloader.right_image_batch
-        semantic = dataloader.semantic_image_batch
-        valid = dataloader.valid_image_batch
-
-        # split for each gpu
-        left_splits  = tf.split(left,  args.num_gpus, 0)
-        right_splits = tf.split(right, args.num_gpus, 0)
-        semantic_splits = tf.split(semantic, args.num_gpus, 0)
-        valid_splits = tf.split(valid, args.num_gpus, 0)        
-
-        tower_grads  = []
-        tower_losses = []
-        vars_to_restore = []
-
-        reuse_variables = None
-        with tf.variable_scope(tf.get_variable_scope()):
-            for i in range(args.num_gpus):
-                with tf.device('/gpu:%d' % i):
-
-                    model = MonodepthModel(params, 'train', args.task, left_splits[i], right_splits[i], semantic_splits[i], valid_splits[i], reuse_variables, i)
-
-                    # Restore weights iff present in checkpoint
-                    if args.checkpoint_path != '' and len(vars_to_restore) == 0: 
-                      vars_to_restore = get_var_to_restore_list(args.checkpoint_path)
-                      print('Vars to restore ' + str(len(vars_to_restore)) + ' vs total vars ' + str(len(tf.trainable_variables())))
-
-                    vars_to_optimize = []
-                    if 'cascade' in args.task and 'cross' not in args.task:
-                      for v in tf.trainable_variables():
-                        if v.name.split(':')[0] not in vars_to_restore:
-                          vars_to_optimize.append(v)
-                    else:
-                      vars_to_optimize = tf.trainable_variables()
-
-                    print('Vars to optimize ' + str(len(vars_to_optimize)) + ' vs total vars ' + str(len(tf.trainable_variables())))
-
-                    loss = model.total_loss
-                    tower_losses.append(loss)
-
-                    reuse_variables = True
-
-                    grads = opt_step.compute_gradients(loss, vars_to_optimize)
-
-                    tower_grads.append(grads)
-
-        grads = average_gradients(tower_grads)
-
-        apply_gradient_op = opt_step.apply_gradients(grads, global_step=global_step)
-
-        total_loss = tf.reduce_mean(tower_losses)
-
-        # SESSION
-        config = tf.ConfigProto(allow_soft_placement=True)
-        config.gpu_options.per_process_gpu_memory_fraction=0.5
-        sess = tf.Session(config=config)
-
-        # INIT
-        sess.run(tf.global_variables_initializer())
-        sess.run(tf.local_variables_initializer())
-        coordinator = tf.train.Coordinator()
-        threads = tf.train.start_queue_runners(sess=sess, coord=coordinator)
-
-        # SAVER
-        train_saver = tf.train.Saver(max_to_keep=0)
-        train_saver.save(sess, args.log_directory + '/' + args.model_name + '/model', global_step=0)        
+    return len(lines)   
 
 def test(params):
     """Test function."""
