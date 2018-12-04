@@ -1,6 +1,6 @@
 # Semantic-Mono-Depth
 
-[[https://github.com/CVLAB-Unibo/Semantic-Mono-Depth/tree/master/images/SemanticMonoDepth.PNG|alt=SemanticMonoDepth]]
+![Semantic-Mono-Depth](https://github.com/CVLAB-Unibo/Semantic-Mono-Depth/tree/master/images/SemanticMonoDepth.PNG)
 
 This repository contains the source code of Semantic-Mono-Depth, proposed in the paper "Geometry meets semantics for semi-supervised monocular depth estimation", ACCV 2018.
 If you use this code in your projects, please cite our paper:
