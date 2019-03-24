@@ -6,13 +6,13 @@ This repository contains the source code of Semantic-Mono-Depth, proposed in the
 If you use this code in your projects, please cite our paper:
 
 ```
-@inproceedings{ramirez18,
-  title     = {Geometry meets semantics for semi-supervised monocular depth estimation},
-  author    = {Pierluigi Zama Ramirez and
-               Matteo Poggi and
-               Fabio Tosi and
-               Stefano Mattoccia and
-               Luigi Di Stefano},
+@inproceedings{ramirez2018,
+  title     = {Geometry meets semantic for semi-supervised monocular depth estimation},
+  author    = {Zama Ramirez, Pierluigi and
+                Poggi, Matteo and
+                Tosi, Fabio and
+                Mattoccia, Stefano and
+                Di Stefano, Luigi},
   booktitle = {14th Asian Conference on Computer Vision (ACCV)},
   year = {2018}
 }
